@@ -1,0 +1,23 @@
+{
+  "name": "ArduinoDesktopServer",
+  "version": "1.0.0",
+  "description": "A PlatformIO library for Arduino desktop server functionality",
+  "keywords": "arduino, server, desktop",
+  "authors": [
+    {
+      "name": "Nayan"
+    }
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/compilerNayan/arduinodesktopserver.git"
+  },
+  "dependencies": {
+    "arduionolibserver": "https://github.com/compilerNayan/arduionolibserver.git"
+  },
+  "license": "MIT",
+  "homepage": "",
+  "frameworks": "arduino",
+  "platforms": "*"
+}
+
