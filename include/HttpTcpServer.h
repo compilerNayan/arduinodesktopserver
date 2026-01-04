@@ -10,25 +10,6 @@
 #include <cstring>
 #include <sstream>
 #include <vector>
-#include <random>
-#include <iomanip>
-#include <unordered_map>
-#ifdef __linux__
-#include <uuid/uuid.h>
-#endif
-
-/**
- * Structure to hold sender details for response routing
- */
-struct SenderDetails {
-    Int clientSocket;
-    StdString clientIp;
-    UInt clientPort;
-    
-    SenderDetails() : clientSocket(-1), clientPort(0) {}
-    SenderDetails(Int socket, CStdString& ip, CUInt port) 
-        : clientSocket(socket), clientIp(ip), clientPort(port) {}
-};
 
 /**
  * HTTP TCP Server implementation of IServer interface
@@ -46,53 +27,12 @@ class HttpTcpServer : public IServer {
     Private ULong sentMessageCount_;
     Private UInt maxMessageSize_;
     Private UInt receiveTimeout_;
-    Private std::unordered_map<StdString, SenderDetails> senderDetailsMap_;
 
     Private Void CloseSocket(Int& socket) {
         if (socket >= 0) {
             close(socket);
             socket = -1;
         }
-    }
-    
-    Private StdString GenerateGuid() {
-#ifdef __linux__
-        uuid_t uuid;
-        uuid_generate_random(uuid);
-        Char uuidStr[37];
-        uuid_unparse_lower(uuid, uuidStr);
-        return StdString(uuidStr);
-#else
-        // Fallback GUID generation for non-Linux systems
-        std::random_device rd;
-        std::mt19937 gen(rd());
-        std::uniform_int_distribution<> dis(0, 15);
-        std::uniform_int_distribution<> dis2(8, 11);
-        
-        std::ostringstream oss;
-        oss << std::hex;
-        for (Size i = 0; i < 8; i++) {
-            oss << dis(gen);
-        }
-        oss << "-";
-        for (Size i = 0; i < 4; i++) {
-            oss << dis(gen);
-        }
-        oss << "-4"; // Version 4
-        for (Size i = 0; i < 3; i++) {
-            oss << dis(gen);
-        }
-        oss << "-";
-        oss << dis2(gen); // Variant
-        for (Size i = 0; i < 3; i++) {
-            oss << dis(gen);
-        }
-        oss << "-";
-        for (Size i = 0; i < 12; i++) {
-            oss << dis(gen);
-        }
-        return oss.str();
-#endif
     }
 
     Private Void SendHttpResponse(Int clientSocket, CStdString& request) {
@@ -321,55 +261,54 @@ class HttpTcpServer : public IServer {
         
         StdString requestString(buffer.data(), totalReceived);
         
-        // Generate GUID for this request
-        StdString requestId = GenerateGuid();
+        // Send HTTP response
+        SendHttpResponse(clientSocket, requestString);
         
-        // Store sender details in map for response routing
-        // Keep socket open so SendMessage() can send response later
-        SenderDetails senderDetails(clientSocket, lastClientIp_, lastClientPort_);
-        senderDetailsMap_[requestId] = senderDetails;
-        
-        // Do NOT send response here - it will be sent via SendMessage() using requestId
-        // Do NOT close socket here - keep it open for the response
+        // Close client socket
+        CloseSocket(clientSocket);
         
         receivedMessageCount_++;
         
-        // Parse and return IHttpRequest with request ID
-        return IHttpRequest::GetRequest(requestString, requestId);
+        // Parse and return IHttpRequest
+        return IHttpRequest::GetRequest(requestString);
     }
 
-    Public Virtual Bool SendMessage(CStdString& requestId, CStdString& message) override {
+    Public Virtual Bool SendMessage(CStdString& message, 
+                            CStdString& clientIp = "", 
+                            CUInt clientPort = 0) override {
+        // For TCP, we typically send responses during ReceiveMessage
+        // This method can be used for sending to a specific client if needed
+        // For now, we'll implement a basic version that sends to the last client
         if (!running_ || serverSocket_ < 0) {
             return false;
         }
         
-        // Look up sender details from the map using request ID
-        auto it = senderDetailsMap_.find(StdString(requestId));
-        if (it == senderDetailsMap_.end()) {
-            return false; // Request ID not found
+        // Accept a connection if we have client info
+        if (!clientIp.empty() && clientPort > 0) {
+            // For TCP, we need an active connection to send
+            // This is a simplified implementation
+            sockaddr_in clientAddress{};
+            clientAddress.sin_family = AF_INET;
+            inet_aton(clientIp.c_str(), &clientAddress.sin_addr);
+            clientAddress.sin_port = htons(static_cast<uint16_t>(clientPort));
+            
+            Int clientSocket = socket(AF_INET, SOCK_STREAM, 0);
+            if (clientSocket < 0) {
+                return false;
+            }
+            
+            if (connect(clientSocket, (struct sockaddr*)&clientAddress, sizeof(clientAddress)) < 0) {
+                CloseSocket(clientSocket);
+                return false;
+            }
+            
+            send(clientSocket, message.c_str(), message.length(), 0);
+            CloseSocket(clientSocket);
+            sentMessageCount_++;
+            return true;
         }
         
-        SenderDetails& senderDetails = it->second;
-        
-        // Socket should be open since we keep it alive in ReceiveMessage()
-        if (senderDetails.clientSocket < 0) {
-            return false; // Socket was already closed or invalid
-        }
-        
-        // Send the response message using the open socket
-        ssize_t bytesSent = send(senderDetails.clientSocket, message.c_str(), message.length(), 0);
-        if (bytesSent < 0) {
-            // Send failed, close socket and clean up
-            CloseSocket(senderDetails.clientSocket);
-            return false;
-        }
-        
-        // Response sent successfully, now close the socket
-        CloseSocket(senderDetails.clientSocket);
-        senderDetails.clientSocket = -1; // Mark as closed
-        
-        sentMessageCount_++;
-        return true;
+        return false;
     }
 
     Public Virtual StdString GetLastClientIp() const override {
@@ -424,33 +363,6 @@ class HttpTcpServer : public IServer {
 
     Public Virtual ServerType GetServerType() const override {
         return ServerType::TCP;
-    }
-    
-    /**
-     * Get sender details for a given request ID
-     * @param requestId The request ID (GUID) to look up
-     * @return SenderDetails if found, or nullptr if not found
-     */
-    Public SenderDetails* GetSenderDetails(CStdString& requestId) {
-        auto it = senderDetailsMap_.find(StdString(requestId));
-        if (it != senderDetailsMap_.end()) {
-            return &it->second;
-        }
-        return nullptr;
-    }
-    
-    /**
-     * Remove sender details for a given request ID (cleanup after response sent)
-     * @param requestId The request ID (GUID) to remove
-     * @return true if found and removed, false otherwise
-     */
-    Public Bool RemoveSenderDetails(CStdString& requestId) {
-        auto it = senderDetailsMap_.find(StdString(requestId));
-        if (it != senderDetailsMap_.end()) {
-            senderDetailsMap_.erase(it);
-            return true;
-        }
-        return false;
     }
 };
 
