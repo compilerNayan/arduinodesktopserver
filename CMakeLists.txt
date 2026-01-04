@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.14)
 
-project(ArduinoDesktopServer 
+project(server-posix 
     VERSION 1.0.0
     LANGUAGES CXX
 )
@@ -24,15 +24,16 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(serverlib)
 
 # Create header-only library (INTERFACE library)
-add_library(ArduinoDesktopServer INTERFACE)
+# Note: CMake target names cannot have hyphens, so we use server_posix
+add_library(server_posix INTERFACE)
 
 # Set target properties
-set_target_properties(ArduinoDesktopServer PROPERTIES
+set_target_properties(server_posix PROPERTIES
     VERSION ${PROJECT_VERSION}
 )
 
 # Set include directories
-target_include_directories(ArduinoDesktopServer INTERFACE
+target_include_directories(server_posix INTERFACE
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>
 )
@@ -41,7 +42,7 @@ target_include_directories(ArduinoDesktopServer INTERFACE
 # Use BUILD_INTERFACE generator expression to properly handle FetchContent paths
 FetchContent_GetProperties(serverlib)
 if(serverlib_SOURCE_DIR)
-    target_include_directories(ArduinoDesktopServer INTERFACE
+    target_include_directories(server_posix INTERFACE
         $<BUILD_INTERFACE:${serverlib_SOURCE_DIR}/include>
     )
 endif()
@@ -49,9 +50,9 @@ endif()
 # Link to serverlib if it provides a target
 # Try to find and link the library target if it exists
 if(TARGET serverlib)
-    target_link_libraries(ArduinoDesktopServer INTERFACE serverlib)
+    target_link_libraries(server_posix INTERFACE serverlib)
 elseif(TARGET serverlib::serverlib)
-    target_link_libraries(ArduinoDesktopServer INTERFACE serverlib::serverlib)
+    target_link_libraries(server_posix INTERFACE serverlib::serverlib)
 else()
     # If no target exists, the include directories above should be sufficient
     # for header-only dependencies
@@ -63,17 +64,17 @@ endif()
 # Optional: Set up installation
 include(GNUInstallDirs)
 
-install(TARGETS ArduinoDesktopServer
-    EXPORT ArduinoDesktopServerTargets
+install(TARGETS server_posix
+    EXPORT server_posixTargets
 )
 
 install(FILES include/HttpTcpServer.h
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 )
 
-install(EXPORT ArduinoDesktopServerTargets
-    FILE ArduinoDesktopServerTargets.cmake
-    NAMESPACE ArduinoDesktopServer::
-    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/ArduinoDesktopServer
+install(EXPORT server_posixTargets
+    FILE server_posixTargets.cmake
+    NAMESPACE server_posix::
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/server-posix
 )
 

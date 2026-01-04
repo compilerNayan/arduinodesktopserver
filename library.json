@@ -1,5 +1,5 @@
 {
-  "name": "ArduinoDesktopServer",
+  "name": "server-posix",
   "version": "1.0.0",
   "description": "A PlatformIO library for Arduino desktop server functionality",
   "keywords": "arduino, server, desktop",
