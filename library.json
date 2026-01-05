@@ -13,7 +13,7 @@
     "url": "https://github.com/compilerNayan/arduinodesktopserver.git"
   },
   "dependencies": {
-    "serverlib": "https://github.com/compilerNayan/arduionolibserver.git#dev"
+    "serverlib": "https://github.com/compilerNayan/arduionolibserver.git"
   },
   "license": "MIT",
   "homepage": "",
