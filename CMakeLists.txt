@@ -17,7 +17,7 @@ include(FetchContent)
 FetchContent_Declare(
     serverlib
     GIT_REPOSITORY https://github.com/compilerNayan/arduionolibserver.git
-    GIT_TAG dev
+    GIT_TAG main
 )
 
 # Make the library available
