@@ -324,42 +324,38 @@ class HttpTcpServer : public IServer {
         return IHttpRequest::GetRequest(requestString, requestId);
     }
 
-    Public Virtual Bool SendMessage(CStdString& message, 
-                            CStdString& clientIp = "", 
-                            CUInt clientPort = 0) override {
-        // For TCP, we typically send responses during ReceiveMessage
-        // This method can be used for sending to a specific client if needed
-        // For now, we'll implement a basic version that sends to the last client
+    Public Virtual Bool SendMessage(CStdString& requestId, CStdString& message) override {
         if (!running_ || serverSocket_ < 0) {
             return false;
         }
         
-        // Accept a connection if we have client info
-        if (!clientIp.empty() && clientPort > 0) {
-            // For TCP, we need an active connection to send
-            // This is a simplified implementation
-            sockaddr_in clientAddress{};
-            clientAddress.sin_family = AF_INET;
-            inet_aton(clientIp.c_str(), &clientAddress.sin_addr);
-            clientAddress.sin_port = htons(static_cast<uint16_t>(clientPort));
-            
-            Int clientSocket = socket(AF_INET, SOCK_STREAM, 0);
-            if (clientSocket < 0) {
-                return false;
-            }
-            
-            if (connect(clientSocket, (struct sockaddr*)&clientAddress, sizeof(clientAddress)) < 0) {
-                CloseSocket(clientSocket);
-                return false;
-            }
-            
-            send(clientSocket, message.c_str(), message.length(), 0);
-            CloseSocket(clientSocket);
-            sentMessageCount_++;
-            return true;
+        // Look up sender details from the map using requestId
+        auto it = requestSenderMap_.find(StdString(requestId));
+        if (it == requestSenderMap_.end()) {
+            return false; // Request ID not found
         }
         
-        return false;
+        SenderDetails& senderDetails = it->second;
+        
+        // Check if socket is valid
+        if (senderDetails.socket < 0) {
+            return false;
+        }
+        
+        // Send the message using the stored socket
+        ssize_t bytesSent = send(senderDetails.socket, message.c_str(), message.length(), 0);
+        if (bytesSent < 0) {
+            return false;
+        }
+        
+        // Close the socket after sending
+        CloseSocket(senderDetails.socket);
+        
+        // Remove the entry from the map after sending
+        requestSenderMap_.erase(it);
+        
+        sentMessageCount_++;
+        return true;
     }
 
     Public Virtual StdString GetLastClientIp() const override {
