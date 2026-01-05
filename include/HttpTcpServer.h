@@ -13,7 +13,6 @@
 #include <random>
 #include <iomanip>
 #include <map>
-#include <iostream>
 
 /**
  * Sender details structure to store client connection information
@@ -326,59 +325,36 @@ class HttpTcpServer : public IServer {
     }
 
     Public Virtual Bool SendMessage(CStdString& requestId, CStdString& message) override {
-        std::cout << "[HttpTcpServer] SendMessage() called with requestId: " << requestId << std::endl;
-        std::cout << "[HttpTcpServer] Server running: " << (running_ ? "true" : "false") << ", serverSocket: " << serverSocket_ << std::endl;
-        std::cout << "[HttpTcpServer] Request sender map size: " << requestSenderMap_.size() << std::endl;
-        
         if (!running_ || serverSocket_ < 0) {
-            std::cout << "[HttpTcpServer] ERROR: Server not running or invalid socket!" << std::endl;
             return false;
         }
         
         // Look up sender details from the map using requestId
-        StdString requestIdStr = StdString(requestId);
-        std::cout << "[HttpTcpServer] Looking up requestId in map: " << requestIdStr << std::endl;
-        
-        auto it = requestSenderMap_.find(requestIdStr);
+        auto it = requestSenderMap_.find(StdString(requestId));
         if (it == requestSenderMap_.end()) {
-            std::cout << "[HttpTcpServer] ERROR: Request ID not found in map!" << std::endl;
-            std::cout << "[HttpTcpServer] Available request IDs in map:" << std::endl;
-            for (const auto& pair : requestSenderMap_) {
-                std::cout << "  - " << pair.first << std::endl;
-            }
             return false; // Request ID not found
         }
         
-        std::cout << "[HttpTcpServer] Found request ID in map!" << std::endl;
         SenderDetails& senderDetails = it->second;
         
         // Check if socket is valid
         if (senderDetails.socket < 0) {
-            std::cout << "[HttpTcpServer] ERROR: Socket in sender details is invalid: " << senderDetails.socket << std::endl;
             return false;
         }
-        
-        std::cout << "[HttpTcpServer] Sending message to socket: " << senderDetails.socket << ", IP: " << senderDetails.ipAddress << ", Port: " << senderDetails.port << std::endl;
-        std::cout << "[HttpTcpServer] Message length: " << message.length() << std::endl;
         
         // Send the message using the stored socket
         ssize_t bytesSent = send(senderDetails.socket, message.c_str(), message.length(), 0);
         if (bytesSent < 0) {
-            std::cout << "[HttpTcpServer] ERROR: send() failed with error: " << strerror(errno) << std::endl;
             return false;
         }
-        
-        std::cout << "[HttpTcpServer] Successfully sent " << bytesSent << " bytes" << std::endl;
         
         // Close the socket after sending
         CloseSocket(senderDetails.socket);
         
         // Remove the entry from the map after sending
         requestSenderMap_.erase(it);
-        std::cout << "[HttpTcpServer] Removed request ID from map. Remaining entries: " << requestSenderMap_.size() << std::endl;
         
         sentMessageCount_++;
-        std::cout << "[HttpTcpServer] SendMessage() completed successfully" << std::endl;
         return true;
     }
 
