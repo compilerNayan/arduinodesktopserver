@@ -10,6 +10,21 @@
 #include <cstring>
 #include <sstream>
 #include <vector>
+#include <random>
+#include <iomanip>
+#include <map>
+
+/**
+ * Sender details structure to store client connection information
+ */
+struct SenderDetails {
+    Int socket;
+    StdString ipAddress;
+    UInt port;
+    
+    SenderDetails() : socket(-1), ipAddress(""), port(0) {}
+    SenderDetails(Int sock, CStdString& ip, CUInt p) : socket(sock), ipAddress(ip), port(p) {}
+};
 
 /**
  * HTTP TCP Server implementation of IServer interface
@@ -27,6 +42,41 @@ class HttpTcpServer : public IServer {
     Private ULong sentMessageCount_;
     Private UInt maxMessageSize_;
     Private UInt receiveTimeout_;
+    Private std_map<StdString, SenderDetails> requestSenderMap_;
+
+    Private StdString GenerateGuid() {
+        std::random_device rd;
+        std::mt19937 gen(rd());
+        std::uniform_int_distribution<> dis(0, 15);
+        std::uniform_int_distribution<> dis2(8, 11);
+        
+        std::ostringstream oss;
+        oss << std::hex;
+        
+        // Generate UUID v4 format: xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
+        for (Size i = 0; i < 8; i++) {
+            oss << dis(gen);
+        }
+        oss << "-";
+        for (Size i = 0; i < 4; i++) {
+            oss << dis(gen);
+        }
+        oss << "-4";
+        for (Size i = 0; i < 3; i++) {
+            oss << dis(gen);
+        }
+        oss << "-";
+        oss << dis2(gen);
+        for (Size i = 0; i < 3; i++) {
+            oss << dis(gen);
+        }
+        oss << "-";
+        for (Size i = 0; i < 12; i++) {
+            oss << dis(gen);
+        }
+        
+        return oss.str();
+    }
 
     Private Void CloseSocket(Int& socket) {
         if (socket >= 0) {
@@ -261,16 +311,17 @@ class HttpTcpServer : public IServer {
         
         StdString requestString(buffer.data(), totalReceived);
         
-        // Send HTTP response
-        SendHttpResponse(clientSocket, requestString);
+        // Generate GUID for this request
+        StdString requestId = GenerateGuid();
         
-        // Close client socket
-        CloseSocket(clientSocket);
+        // Store sender details against the GUID
+        SenderDetails senderDetails(clientSocket, lastClientIp_, lastClientPort_);
+        requestSenderMap_[requestId] = senderDetails;
         
         receivedMessageCount_++;
         
-        // Parse and return IHttpRequest
-        return IHttpRequest::GetRequest(requestString);
+        // Parse and return IHttpRequest with request ID
+        return IHttpRequest::GetRequest(requestString, requestId);
     }
 
     Public Virtual Bool SendMessage(CStdString& message, 
