@@ -321,7 +321,7 @@ class HttpTcpServer : public IServer {
         receivedMessageCount_++;
         
         // Parse and return IHttpRequest with request ID
-        return IHttpRequest::GetRequest(requestString, requestId);
+        return IHttpRequest::GetRequest(requestId, requestString);
     }
 
     Public Virtual Bool SendMessage(CStdString& requestId, CStdString& message) override {
