@@ -226,7 +226,7 @@ class HttpTcpServer : public IServer {
         // Receive HTTP request - read headers first
         // Use dynamic buffer based on maxMessageSize_ (default allows up to 100MB)
         Size bufferSize = maxMessageSize_ > 0 ? maxMessageSize_ : 104857600; // 100MB default max
-        std::vector<Char> buffer(bufferSize, 0);
+        Vector<Char> buffer(bufferSize, 0);
         Size totalReceived = 0;
         
         // Read until we get the headers (double CRLF)
