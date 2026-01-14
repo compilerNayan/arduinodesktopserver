@@ -7,7 +7,9 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <unistd.h>
+#include <cerrno>
 #include <cstring>
+#include <iostream>
 #include <sstream>
 #include <vector>
 #include <random>
@@ -126,53 +128,81 @@ class HttpTcpServer : public IServer {
     }
 
     Public Virtual Bool Start(CUInt port = DEFAULT_SERVER_PORT) override {
+        std::cout << "[HttpTcpServer] Start() called with port: " << port << std::endl;
+        
         if (running_) {
+            std::cout << "[HttpTcpServer] ERROR: Server is already running!" << std::endl;
             return false;
         }
 
         port_ = port;
+        std::cout << "[HttpTcpServer] Port set to: " << port_ << std::endl;
+        std::cout << "[HttpTcpServer] IP Address: " << ipAddress_ << std::endl;
         
         // Create socket
+        std::cout << "[HttpTcpServer] Step 1: Creating socket..." << std::endl;
         serverSocket_ = socket(AF_INET, SOCK_STREAM, 0);
         if (serverSocket_ < 0) {
+            std::cout << "[HttpTcpServer] ERROR: Failed to create socket (errno: " << errno << ")" << std::endl;
             return false;
         }
+        std::cout << "[HttpTcpServer] Socket created successfully, fd: " << serverSocket_ << std::endl;
         
         // Set socket option to reuse address
+        std::cout << "[HttpTcpServer] Step 2: Setting socket options (SO_REUSEADDR)..." << std::endl;
         Int opt = 1;
         if (setsockopt(serverSocket_, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
+            std::cout << "[HttpTcpServer] ERROR: Failed to set socket options (errno: " << errno << ")" << std::endl;
             CloseSocket(serverSocket_);
             return false;
         }
+        std::cout << "[HttpTcpServer] Socket options set successfully" << std::endl;
         
         // Bind socket to address
+        std::cout << "[HttpTcpServer] Step 3: Binding socket to address..." << std::endl;
         sockaddr_in serverAddress{};
         serverAddress.sin_family = AF_INET;
         
         // Set IP address
         if (ipAddress_ == "0.0.0.0") {
             serverAddress.sin_addr.s_addr = INADDR_ANY;
+            std::cout << "[HttpTcpServer] Using INADDR_ANY (0.0.0.0)" << std::endl;
         } else {
+            std::cout << "[HttpTcpServer] Parsing IP address: " << ipAddress_ << std::endl;
             if (inet_aton(ipAddress_.c_str(), &serverAddress.sin_addr) == 0) {
+                std::cout << "[HttpTcpServer] ERROR: Failed to parse IP address: " << ipAddress_ << std::endl;
                 CloseSocket(serverSocket_);
                 return false;
             }
+            std::cout << "[HttpTcpServer] IP address parsed successfully" << std::endl;
         }
         
         serverAddress.sin_port = htons(static_cast<uint16_t>(port_));
+        std::cout << "[HttpTcpServer] Binding to port: " << port_ << " (network byte order: " << serverAddress.sin_port << ")" << std::endl;
         
         if (bind(serverSocket_, (struct sockaddr*)&serverAddress, sizeof(serverAddress)) < 0) {
+            std::cout << "[HttpTcpServer] ERROR: Failed to bind socket to port " << port_ << " (errno: " << errno << ")" << std::endl;
+            if (errno == EADDRINUSE) {
+                std::cout << "[HttpTcpServer] ERROR: Port " << port_ << " is already in use!" << std::endl;
+            } else if (errno == EACCES) {
+                std::cout << "[HttpTcpServer] ERROR: Permission denied to bind to port " << port_ << std::endl;
+            }
             CloseSocket(serverSocket_);
             return false;
         }
+        std::cout << "[HttpTcpServer] Socket bound successfully to port " << port_ << std::endl;
         
         // Listen for connections
+        std::cout << "[HttpTcpServer] Step 4: Starting to listen for connections..." << std::endl;
         if (listen(serverSocket_, 5) < 0) {
+            std::cout << "[HttpTcpServer] ERROR: Failed to listen on socket (errno: " << errno << ")" << std::endl;
             CloseSocket(serverSocket_);
             return false;
         }
+        std::cout << "[HttpTcpServer] Listening for connections with backlog: 5" << std::endl;
         
         running_ = true;
+        std::cout << "[HttpTcpServer] Server started successfully! Running: " << (running_ ? "true" : "false") << std::endl;
         return true;
     }
 
