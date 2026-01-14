@@ -30,7 +30,7 @@ struct SenderDetails {
  * HTTP TCP Server implementation of IServer interface
  * Header-only implementation using standard TCP sockets
  */
-/// @ServerImpl("http tcp server")
+/* @ServerImpl("http tcp server") */
 class HttpTcpServer : public IServer {
     Private UInt port_;
     Private Int serverSocket_;
