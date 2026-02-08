@@ -16,7 +16,7 @@ include(FetchContent)
 # Fetch the serverlib library from GitHub
 FetchContent_Declare(
     serverlib
-    GIT_REPOSITORY https://github.com/compilerNayan/arduionolibserver.git
+    GIT_REPOSITORY https://github.com/compilerNayan/arduinolibserver.git
     GIT_TAG main
 )
 
