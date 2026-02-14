@@ -44,7 +44,7 @@ class HttpTcpServer : public IServer {
     Private ULong sentMessageCount_;
     Private UInt maxMessageSize_;
     Private UInt receiveTimeout_;
-    Private Map<StdString, SenderDetails> requestSenderMap_;
+    Private StdMap<StdString, SenderDetails> requestSenderMap_;
 
     Private StdString GenerateGuid() {
         std::random_device rd;
@@ -229,7 +229,7 @@ class HttpTcpServer : public IServer {
         // Receive HTTP request - read headers first
         // Use dynamic buffer based on maxMessageSize_ (default allows up to 100MB)
         Size bufferSize = maxMessageSize_ > 0 ? maxMessageSize_ : 104857600; // 100MB default max
-        Vector<Char> buffer(bufferSize, 0);
+        StdVector<Char> buffer(bufferSize, 0);
         Size totalReceived = 0;
         
         // Read until we get the headers (double CRLF)
